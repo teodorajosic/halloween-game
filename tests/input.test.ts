@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createKeyboard } from '../src/input.js';
 import {
   attachKeyboard,
+  wireKeyboardToGame,
   type KeyboardTarget,
   type KeyEventLike,
 } from '../src/input-dom.js';
@@ -168,5 +169,33 @@ describe('attachKeyboard', () => {
     expect(fake.count()).toBe(4);
     handle.dispose();
     expect(fake.count()).toBe(0);
+  });
+});
+
+describe('wireKeyboardToGame', () => {
+  it('does not leak handlers on restart: one press gives one dispatch after ten restarts', () => {
+    const fake = fakeTarget();
+    const restartHandlers: (() => void)[] = [];
+    const fakeGame = {
+      dispatch: vi.fn(),
+      on: (type: string, handler: () => void) => {
+        if (type === 'restart') restartHandlers.push(handler);
+        return () => undefined;
+      },
+    };
+
+    wireKeyboardToGame(fake.target, createKeyboard(), fakeGame);
+
+    fake.key('keydown', 'Space');
+    expect(fakeGame.dispatch).toHaveBeenCalledTimes(1);
+    expect(fakeGame.dispatch).toHaveBeenCalledWith('primary');
+
+    fakeGame.dispatch.mockClear();
+    for (let i = 0; i < 10; i += 1) {
+      for (const handler of restartHandlers) handler();
+    }
+    fake.key('keydown', 'Space');
+
+    expect(fakeGame.dispatch).toHaveBeenCalledTimes(1);
   });
 });

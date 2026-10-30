@@ -331,6 +331,21 @@ describe('2.2 jumping', () => {
     expect(jumps).toHaveLength(2);
     expect(game.state().dino.onGround).toBe(false);
   });
+
+  it('drops leftover queued intents after consuming one per step', () => {
+    const { game } = makeGame(undefined, { deps: { collisions: false } });
+    const jumps = collect(game, 'jump');
+
+    game.dispatch('primary');
+    game.dispatch('primary');
+    game.tick(1);
+
+    const state = game.state();
+    expect(state.phase).toBe('running');
+    expect(state.tick).toBe(1);
+    expect(state.dino.onGround).toBe(true);
+    expect(jumps).toHaveLength(0);
+  });
 });
 
 describe('2.2 legs alternate', () => {
@@ -829,6 +844,22 @@ describe('2.7 restarting', () => {
 
     expect(game.state()).toEqual(before);
     expect(events).toEqual([]);
+  });
+
+  it('restarts with tick 0 and START_SPEED regardless of the dying run pace', () => {
+    const { game } = makeGame(undefined, { seeds: [5, 9] });
+    pressPrimary(game);
+    dieWithoutJumping(game);
+    const pre = game.state();
+    expect(pre.tick).toBeGreaterThan(0);
+    expect(pre.speed).toBeGreaterThanOrEqual(START_SPEED);
+
+    game.dispatch('primary');
+    game.tick(1);
+
+    const state = game.state();
+    expect(state.tick).toBe(0);
+    expect(state.speed).toBe(START_SPEED);
   });
 });
 
